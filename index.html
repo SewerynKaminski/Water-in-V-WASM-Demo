@@ -97,7 +97,7 @@
                                 s = canvas.height/c.height
                                 let w = canvas.width/s 
                                 x-=(c.width-w)/2
-                                if ( x < 0 || x > w ) { return }               $
+                                if ( x < 0 || x > w ) { return }
                             } else { 
                                 s = canvas.width/c.width
                                 let h = canvas.height/s 
@@ -105,7 +105,7 @@
                                 if ( y < 0 || y > h ) { return }
                             }
                         }
-			f_mouse_down ( app, sx*x, sy*y )
+			f_mouse_down ( app, s*x, sy*y )
 		} )
 		canvas.addEventListener ( "mouseup",   (event) => {
 			let s = 1//!document.fullscreen + document.fullscreen * canvas.width/canvas.getBoundingClientRect().width
@@ -118,7 +118,7 @@
                                 s = canvas.height/c.height
                                 let w = canvas.width/s 
                                 x-=(c.width-w)/2
-                                if ( x < 0 || x > w ) { return }               $
+                                if ( x < 0 || x > w ) { return }
                             } else { 
                                 s = canvas.width/c.width
                                 let h = canvas.height/s 
