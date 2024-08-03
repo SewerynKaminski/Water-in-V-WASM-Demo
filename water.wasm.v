@@ -14,10 +14,10 @@ const half_width = i32(width/2)
 const half_height = i32(height/2)
 const size = width*(height+2)*2
 
-//@[heap]
+@[heap]
 struct App{
 	mut: old_idx i32 = width
-	new_idx i32 = width*(height+3)
+	new_idx i32 = i32(width*(height+3))
 	frame [480*270]u8
 	texture [480*270]u8
 	ripple_map [480*(270+3)*2]i16
@@ -47,16 +47,6 @@ fn srand ( seed u32 ) {
 
 
 pub fn (mut this App) draw () {
-	/*mut i:=0
-	for i<480*270 {unsafe{ 
-			pd := &this.frame[0]+i
-			ps := &this.texture[0]+i
-			*pd = *ps // GOOD!
-			// *(&this.frame[0]+i) = u8(rand())// BAD!
-		}i+=1}
-	*/
-	
-	unsafe{
 	mut i:= i32(0)
     
         i = this.old_idx
@@ -66,41 +56,34 @@ pub fn (mut this App) draw () {
 	// Initialize the looping values - each will be incremented
         mut map_idx := this.old_idx
 
-	ripple_map := &this.ripple_map[0]
-	mut y:= i32(0)
-        for y < height {
-		mut x:= i32(0)
-                for x < width {
+        for y:=0; y < height; y+=1 {
+		map_idx+=1
+	        i+=1
+                for x:=1; x < width-1; x+=1 {
 		    // Use ripple_map to set data value, map_idx = oldIdx
-		    // Use averaged values of pixels: above, below, left and right of current
-		    mut p:= ripple_map + (map_idx - 1)*2
-		    mut data := *p
-			p = ripple_map + (map_idx + 1)*2
-                    data += *p
-			p = ripple_map + (map_idx - width)*2
-		    data += *p
-			p = ripple_map + (map_idx + width)*2
-		    data += *p
+		    // Use averaged values of pixels: above, below, left and right of current	
+		    mut data:= this.ripple_map [ map_idx - 1]
+		    data += this.ripple_map [ map_idx + 1]
+		    data += this.ripple_map [ map_idx - width]
+		    data += this.ripple_map [ map_idx + width]			
                     data >>= 1    // right shift 1 is same as divide by 2
 		    // Subtract 'previous' value (we are about to overwrite rippleMap[newIdx+i])
-		    p = ripple_map + (this.new_idx + i)*2
-		    data -= *p
+		    data -= this.ripple_map[this.new_idx + i]
 		    
 		    // Reduce value more -- for damping
 		    // data = data - (data / 32)
                     data -= data >> 5
 		    
 		    // Set new value
-		    //p = ripple_map + this.new_idx + i
-                    *p = data
+		    ii := this.new_idx + i
+		    this.ripple_map[ii] = data
 
                     // If data = 0 then water is flat/still,
 		    // If data > 0 then water has a wave
                     data = (1<<10) - data  // zawsze dodatnie
         
-		    p = &this.last_map[0] + i*2
-                    old_data := *p
-                    *p = data
+		    old_data := this.last_map[i]
+		    this.last_map[i] = data
         
                     if old_data != data { // if no change no need to alter image
                         // Calculate pixel offsets
@@ -114,18 +97,14 @@ pub fn (mut this App) draw () {
                         if b < 0 { b = 0 }
 			
 			// Apply values
-			ps:= &this.texture[0] + a + (b * width)
-			pd:= &this.frame[0] + i
-                        *pd = *ps
+			this.frame[i] = this.texture[a + (b * width)]
                     }
                     map_idx += 1
                     i += 1
-		
-		    x+=1
                 }
-		y+=1
+		map_idx+=1
+		i+=1
             }
-	}
 }
 
 pub fn (mut this App)mousedown(x u32,y u32) {
@@ -138,17 +117,20 @@ const ripple_r = 3
 
 pub fn (mut this App)mousemove(x u32, y u32){
     // Our ripple effect area is actually a square, not a circle
-    mut j:= i32(y-ripple_r)
-    for j < y + ripple_r {
-	mut k:=i32(x - ripple_r)
-        for k < x + ripple_r {
-	    unsafe {
-	    p:= &this.ripple_map[0] + this.old_idx*2
-	    p+= ((j * i32(width)) + k)*2
-            *p += 512 }
-	    k+=1
+    xmr := i32(x - ripple_r)
+    ymr := i32(y - ripple_r)
+    xpr := x + ripple_r
+    ypr := y + ripple_r
+	
+    for j:= ymr; j < ypr; j+=1 {
+        if j<0 { j=0 }
+	if j>=height { break }
+        for k:=xmr; k < xpr; k+=1 {	    
+	    if k<1 { k=1 }
+	    if k>=width-1 { break }
+	    i:= this.old_idx + ((j * i32(width)) + k)
+	    this.ripple_map[i] += 512
         }
-	j+=1
     }
 }
 
@@ -167,10 +149,8 @@ fn cmp( a &u8, b &u8 ) bool {
    unsafe {
         for *a>0 && *b>0 {
 		if *a!=*b { break }
-		//println( string{a,1} )
 		a+=1
 		b+=1
-		//println(".")
         }
 	return *a==*b
    }
@@ -194,26 +174,19 @@ pub fn (mut app App)keyup( key &u8, code &u8) {
 pub fn main() {
 	vwasm_memory_grow(10)
 
-	title := "V WASM Fire demo"
+	title := "V WASM Water demo"
 	JS.settitle ( title )
 	JS.init( app )
 
-	mut y:=0
-	for y<height {
-		mut x:=0
-		for x<width {
-			unsafe{
-			p := &app.texture[0]+x+y*width
-			if (x%50 < 25) == (y%50 < 25) { *p = 128 }
-			else { *p = 0 }
-			}
-			x+=1
+	for y:=0; y<height; y+=1 {
+	    for x:=0; x<width; x+=1 {
+		if (x%50 < 25) == (y%50 < 25) { 
+		    app.texture[x+y*width] = 128
+		} else {
+		    app.texture[x+y*width] = 0
 		}
-		y+=1
+	    }
 	}
 
-	JS.showptr ( &app.old_idx )
-	JS.showptr ( &app.new_idx )
-	//fire( &app.frame[0] )
 	app.draw()
 }
