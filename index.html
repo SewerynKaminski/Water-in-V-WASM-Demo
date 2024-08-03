@@ -1,0 +1,395 @@
+<html lang="en"><body style="background-color:black;margin:0;"><script>
+	var canvas = document.createElement('canvas')
+	Object.assign ( canvas, { width : 480, height: 270, style : "image-rendering: crisp-edges; position:absolute; top:0; bottom:0; left:0; right:0; margin:auto;"})
+	document.body.appendChild ( canvas )
+	var ctx = canvas.getContext("2d")
+	ctx.fillStyle = "#000"
+	ctx.fillRect(0, 0, canvas.width, canvas.height)
+	
+/*		                
+        var width       = canvas.width
+        var height      = canvas.height
+        var halfWidth   = width  >> 1
+        var halfHeight  = height >> 1
+        var size        = width * (height + 2) * 2   // space for 2 images (old and new), +2 to cover ripple radius <= 3
+        var delay       = 30                         // delay is desired FPS
+        var oldIdx      = width
+        var newIdx      = width * (height + 3)       // +2 from above size calc +1 more to get to 2nd image
+        var rippleRad   = 3
+
+        var rippleMap   = []
+        var lastMap     = []
+        var mapIdx
+        
+        // texture and ripple will hold the image data to be displayed
+        var ripple
+        var texture
+        
+        // Any image can be used, but we will create a simple pattern instead
+        // So need some variables to create the background/underwater image
+        var stripeWidth = 25
+        var step        = stripeWidth * 2
+        var count       = height / stripeWidth
+        
+        canvas.width = width
+        canvas.height = height
+        
+        // Here is a neat trick so you don't have to type ctx.blah over and over again
+        with (ctx) {
+            fillStyle = '#008888'
+            fillRect(0, 0, width, height)
+            fillStyle = '#00ff77'
+            
+            // Save the transform state
+            save()
+            
+            // Perform rotation to make diagonal lines
+            rotate(-0.250)
+            for (var i = 0; i < count; i++){
+                // Go long on the width to make certain we draw
+                // across the entire viewable area --- with the rotation
+                // Yes. This can be done more exactly, but this should make
+                // it easier to play with the rotation value.
+                fillRect(-width, i * step, width * 2, stripeWidth)
+            }
+            
+            // Restore the transform state
+            restore()
+        }
+        
+        // Initialize the texture and ripple image data
+	// Texture will never be changed
+	// Ripple is what will be altered and displayed --> see run() function
+        texture = ctx.getImageData(0, 0, width, height)
+        ripple = ctx.getImageData(0, 0, width, height)
+        
+        // Initialize the maps
+        for (var i = 0; i < size; i++) {
+            lastMap[i]   = 0
+            rippleMap[i] = 0
+        }
+        
+        // --------------------- Main Run Loop -------------------
+        function run() {
+            newframe()
+            ctx.putImageData(ripple, 0, 0)
+        }
+        
+	// Drop something in the water at location: dx, dy
+        function dropAt(dx, dy) {
+            // Make certain dx and dy are integers
+            // Shifting left 0 is slightly faster than parseInt and math.* (or used to be)
+            dx <<= 0
+            dy <<= 0
+            
+	    // Our ripple effect area is actually a square, not a circle
+            for (var j = dy - rippleRad; j < dy + rippleRad; j++) {
+                for (var k = dx - rippleRad; k < dx + rippleRad; k++) {
+                    rippleMap[oldIdx + (j * width) + k] += 512;
+                }
+            }
+        }
+        
+	// Create the next frame of the ripple effect
+        function newframe() {
+            var i;
+            var a, b;
+            var data, oldData;
+            var curPixel, newPixel
+            
+            // Store indexes - old and new may be misleading/confusing
+	    //               - current and next is slightly more accurate
+	    //               - previous and current may also help in thinking
+            i = oldIdx
+            oldIdx = newIdx
+            newIdx = i
+            
+	    // Initialize the looping values - each will be incremented
+            i = 0
+            mapIdx = oldIdx
+            
+            for (var y = 0; y < height; y++) {
+                for (var x = 0; x < width; x++) {
+		    // Use rippleMap to set data value, mapIdx = oldIdx
+		    // Use averaged values of pixels: above, below, left and right of current
+                    data = (rippleMap[mapIdx - width] + 
+                            rippleMap[mapIdx + width] + 
+                            rippleMap[mapIdx - 1] + 
+                            rippleMap[mapIdx + 1]) /2    // right shift 1 is same as divide by 2
+      		    data = Math.floor(data)
+
+		    // Subtract 'previous' value (we are about to overwrite rippleMap[newIdx+i])
+                    data -= rippleMap[newIdx + i]
+		    
+		    // Reduce value more -- for damping
+		    // data = data - (data / 32)
+                    data -= data / 32
+		    data = Math.floor(data)
+
+		    // Set new value
+                    rippleMap[newIdx + i] = data
+
+                    // If data = 0 then water is flat/still,
+		    // If data > 0 then water has a wave
+                    data = (1<<13) - data
+		    data = Math.floor(data)
+        
+                    oldData = lastMap[i]
+                    lastMap[i] = data
+        
+                    if (oldData != data) { // if no change no need to alter image
+			// Recall using "<< 0" forces integer value
+                        // Calculate pixel offsets
+                        a = (((x - halfWidth) * data) >>13) + halfWidth
+                        b = (((y - halfHeight) * data) >>13) + halfHeight
+                        
+                        // Don't go outside the image (i.e. boundary check)
+                        if (a >= width) a = width - 1
+                        if (a < 0) a = 0
+                        if (b >= height) b = height - 1
+                        if (b < 0) b = 0
+			
+			// Set indexes
+                        newPixel = (a + (b * width)) * 4
+                        curPixel = i * 4
+                        
+			// Apply values
+                        ripple.data[curPixel]     = texture.data[newPixel]
+                        ripple.data[curPixel + 1] = texture.data[newPixel + 1]
+                        ripple.data[curPixel + 2] = texture.data[newPixel + 2]
+                    }
+                    mapIdx++
+                    i++
+                }
+            }
+            //mapIdx = mapIdx;
+        }
+	
+	// Select random location to create drops
+	// So if user is doing nothing, water still
+	// gets ripples.
+	function randomDrop() {
+	    // Make it a little, irregular in timing
+	    if ( Math.random() > 0.3 ) {
+                dropAt(Math.random() * width, Math.random() * height)
+	    }
+	}
+	
+	// Event handler for mouse motion
+        canvas.onmousemove = function(evt) {
+            dropAt(evt.offsetX || evt.layerX, evt.offsetY || evt.layerY)
+        }
+        
+	// Begin our infinite loop
+	// For user interaction and display updates
+        setInterval ( run, delay )
+*/
+	var app
+	function get_string(ptr, len) {
+		const buf = new Uint8Array(memory.buffer, ptr, len);
+		const str = new TextDecoder("utf8").decode(buf);
+		return str;
+	}
+
+        function get_vstring(ptr) {
+                console.log( ptr )
+                const b = new Uint32Array(memory.buffer, ptr, 2);
+                console.log( b[0] )
+                const buf = new Uint8Array(memory.buffer, b[0], b[1]);
+                const str = new TextDecoder("utf8").decode(buf);
+                return str;
+        }
+	
+	
+
+        const env = {
+                canvas_x: () => canvas.width,
+                canvas_y: () => canvas.height,
+                setpixel: (x, y, c) => {
+                        ctx.fillStyle = "rgba("+c+","+c+","+c+",1)"
+                        ctx.fillRect(x, y, 1, 1)
+                },
+                line: (x0,y0,x1,y1,c)=>{
+                        ctx.beginPath()
+                        ctx.strokeStyle = "rgb("+(c>>16&0xff)+","+(c>>8&0xff)+","+(c&0xff)+")"
+                        ctx.moveTo(x0,y0)
+                        ctx.lineTo(x1,y1)
+                        ctx.stroke()
+                },
+                settitle: (ptr) => {
+                        document.title = get_vstring(ptr)
+                },
+                teststr: ( s ) =>{
+                        console.log( get_vstring( s ) )
+                },
+		showptr: ( ptr ) => { console.log(ptr) },
+                test: ( rect ) => {
+                        const buf = new Int32Array(memory.buffer, rect, 4);
+                        var r={
+                                x : buf[0],
+                                y : buf[1],
+                                w : buf[2],
+                                h : buf[3],
+                                }
+                        console.log( r )
+                        ctx.fillStyle = "rgba("+255+","+255+","+255+",1)"
+                        ctx.fillRect(r.x, r.y, r.w, r.h)
+                },
+                init: ( a ) => {
+                        app=a
+                },
+                __writeln: (ptr, len) => {
+                        console.log(get_string(ptr, len));
+                },
+                __write: (ptr, len) => {
+                        console.log(get_string(ptr, len));
+                },
+                __panic_abort: (ptr, len) => {
+                        throw get_string(ptr, len);
+                },
+        };        
+
+	WebAssembly.instantiateStreaming(fetch("water.wasm"), {
+		env: env,
+	}).then((res) => {
+		console.time("main.main")
+		console.log(env.canvas_x())
+		console.log(env.canvas_y())
+		memory = res.instance.exports.memory
+		const imageData = ctx.createImageData(480, 270);
+
+		f_mouse_down = res.instance.exports["main.App.mousedown"]
+		f_mouse_up   = res.instance.exports["main.App.mouseup"]
+		f_mouse_move = res.instance.exports["main.App.mousemove"]
+		f_key_down   = res.instance.exports["main.App.keydown"]
+		f_key_up     = res.instance.exports["main.App.keyup"]
+		f_draw	     = res.instance.exports["main.App.draw"]
+
+		// Mouse events
+		canvas.addEventListener ( "mousedown", (event) => {
+			canvas.requestFullscreen()
+			let c = canvas.getBoundingClientRect()
+			let s = 1//!document.fullscreen + document.fullscreen * canvas.width/c.width
+			let x = event.offsetX
+			let y = event.offsetY
+                        if ( document.fullscreen ) {
+                            if ( c.width>c.height ) {
+                                s = canvas.height/c.height
+                                let w = canvas.width/s 
+                                x-=(c.width-w)/2
+                                if ( x < 0 || x > w ) { return }               $
+                            } else { 
+                                s = canvas.width/c.width
+                                let h = canvas.height/s 
+                                y-=(c.height-h)/2
+                                if ( y < 0 || y > h ) { return }
+                            }
+                        }
+			f_mouse_down ( app, sx*x, sy*y )
+		} )
+		canvas.addEventListener ( "mouseup",   (event) => {
+			let s = 1//!document.fullscreen + document.fullscreen * canvas.width/canvas.getBoundingClientRect().width
+			let c = canvas.getBoundingClientRect()
+			let x = event.offsetX
+                        let y = event.offsetY
+                        if ( document.fullscreen ) {
+			    // TODO: poprawnie obsluzyc skalowanie
+                            if ( c.width>c.height ) {
+                                s = canvas.height/c.height
+                                let w = canvas.width/s 
+                                x-=(c.width-w)/2
+                                if ( x < 0 || x > w ) { return }               $
+                            } else { 
+                                s = canvas.width/c.width
+                                let h = canvas.height/s 
+                                y-=(c.height-h)/2
+                                if ( y < 0 || y > h ) { return }
+                            }
+                        }
+			f_mouse_up ( app, s*x, s*y )
+		} )
+		canvas.addEventListener ( "mousemove", (event) => {
+			let s = 1//!document.fullscreen + document.fullscreen * canvas.width/canvas.getBoundingClientRect().width
+			let x = event.offsetX
+                        let y = event.offsetY
+			let c = canvas.getBoundingClientRect()
+			if ( document.fullscreen ) {
+                            if ( c.width>c.height ) {
+                                s = canvas.height/c.height
+				let w = canvas.width/s
+				x-=(c.width-w)/2
+				if ( x < 0 || x > w ) { return }				
+                            } else {
+                                s = canvas.width/c.width
+                                let h = canvas.height/s
+                                y-=(c.height-h)/2
+                                if ( y < 0 || y > h ) { return }
+			    }
+			}
+			f_mouse_move ( app, s*x, s*y )
+		} )
+		// Touch events
+		canvas.addEventListener ( "touchstart", (event) => {
+			var touch = event.touches[0]
+			var mouseEvent = new MouseEvent("mousedown", {
+                                clientX: touch.clientX, clientY: touch.clientY
+                        })
+                        canvas.dispatchEvent(mouseEvent)
+		}, false )
+		canvas.addEventListener ( "touchmove", (event) => {
+			var touch = event.touches[0];
+			var mouseEvent = new MouseEvent("mousemove", {
+				clientX: touch.clientX, clientY: touch.clientY
+			})
+			canvas.dispatchEvent(mouseEvent)
+		}, false)
+		canvas.addEventListener ( "touchend", (event) => {
+                        var touch = event.touches[0];
+                        var mouseEvent = new MouseEvent("mouseup", {
+                                clientX: touch.clientX, clientY: touch.clientY
+                        })
+                        canvas.dispatchEvent(mouseEvent)
+                }, false)
+		console.log( res.instance.exports.memory )
+
+		// TODO: umozliwic sterowanie paleta kolorow z WASM
+		let palette=[]
+		for( let c=0;c<256;c++){
+			let cr=0, cg=0, cb=0
+                        if ( c<64 ) { cr=c*255/63;}
+                        else if ( c<64*2 ) {cr=255; cg=255*(c-64)/63 }
+                        else { cr=255; cg=255; cb=255*(c-2*64)/63 }
+			palette[c] = (0xff<<24) | (cb<<16) | (cg<<8) | cr
+		}
+
+		// Keyboard events
+		addEventListener ( "keydown",   (event) => {				
+				let ofs = 0x0
+				console.log(event.key, event.code)
+				kl = event.key.length
+				new Uint8Array(res.instance.exports.memory.buffer,ofs).set( new TextEncoder().encode( event.key ), 0 )
+				new Uint8Array(res.instance.exports.memory.buffer,ofs).set( new TextEncoder().encode( event.code ), kl+1 )
+				f_key_down ( app, ofs, ofs+kl+1 )
+		} )
+		addEventListener ( "keyup",   (event) => {
+				let ofs = 0x0
+				let kl = event.key.length
+				let cl = event.code.length
+				new Uint8Array(res.instance.exports.memory.buffer,ofs).set( new TextEncoder().encode( event.key+'\0' ), 0 )
+				new Uint8Array(res.instance.exports.memory.buffer,ofs).set( new TextEncoder().encode( event.code+'\0' ), kl+1 )
+				f_key_up ( app, ofs, ofs+kl+1 )
+		} )
+
+		res.instance.exports["main.main"]()
+		console.timeEnd("main.main")
+		setInterval(()=>{ 
+			f_draw(app)
+			let img = new Uint8Array ( res.instance.exports.memory.buffer, app+8, 480*270 )
+			let pixels= new Int32Array( imageData.data.buffer )
+                        for ( let i=0; i < 480*270; i++ ) {
+				pixels[i] = palette[img[i]]
+                        }
+                        ctx.putImageData( imageData, 0, 0 )
+		}, 20)
+	});
+</script></body></html>
