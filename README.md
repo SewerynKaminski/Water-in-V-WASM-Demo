@@ -1,4 +1,4 @@
-# Water-in-V-WASM-Demo
+# Water in V WASM Demo
 Old school water ripple effect ported to the web from Mode X.
 Written in V and build to WASM for the browser.
 
