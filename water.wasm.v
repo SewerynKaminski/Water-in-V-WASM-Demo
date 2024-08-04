@@ -46,64 +46,64 @@ fn srand ( seed u32 ) { // set seed
 }
 
 pub fn (mut this App) draw () {
-  mut i:= i32(0)
+    mut i:= i32(0)
     
-  i = this.old_idx
-  this.old_idx = this.new_idx
-  this.new_idx = i
-  i=0
-  // Initialize the looping values - each will be incremented
-  mut map_idx := this.old_idx
+    i = this.old_idx
+    this.old_idx = this.new_idx
+    this.new_idx = i
+    i=0
+    // Initialize the looping values - each will be incremented
+    mut map_idx := this.old_idx
 
-  for y:=0; y < height; y+=1 {
-    map_idx+=1
-    i+=1
-    for x:=1; x < width-1; x+=1 {
-        // Use ripple_map to set data value, map_idx = oldIdx
-        // Use averaged values of pixels: above, below, left and right of current	
-        mut data:= this.ripple_map [map_idx - 1]
-        data += this.ripple_map [map_idx + 1]
-        data += this.ripple_map [map_idx - width]
-        data += this.ripple_map [map_idx + width]			
-        data >>= 1    // right shift 1 is same as divide by 2
-        // Subtract 'previous' value (we are about to overwrite rippleMap[newIdx+i])
-        data -= this.ripple_map[this.new_idx + i]
+    for y:=0; y < height; y+=1 {
+        map_idx+=1
+        i+=1
+        for x:=1; x < width-1; x+=1 {
+            // Use ripple_map to set data value, map_idx = oldIdx
+            // Use averaged values of pixels: above, below, left and right of current	
+            mut data:= this.ripple_map [map_idx - 1]
+            data += this.ripple_map [map_idx + 1]
+            data += this.ripple_map [map_idx - width]
+            data += this.ripple_map [map_idx + width]			
+            data >>= 1    // right shift 1 is same as divide by 2
+            // Subtract 'previous' value (we are about to overwrite rippleMap[newIdx+i])
+            data -= this.ripple_map[this.new_idx + i]
 
-        // Reduce value more -- for damping
-        // data = data - (data / 32)
-        data -= data >> 5
+            // Reduce value more -- for damping
+            // data = data - (data / 32)
+            data -= data >> 5
 
-        // Set new value
-        ii := this.new_idx + i
-        this.ripple_map[ii] = data
+            // Set new value
+            ii := this.new_idx + i
+            this.ripple_map[ii] = data
 
-        // If data = 0 then water is flat/still,
-        // If data != 0 then water has a wave
-        data = (1<<10) - data  // data > 0
+            // If data = 0 then water is flat/still,
+            // If data != 0 then water has a wave
+            data = (1<<10) - data  // data > 0
         
-        old_data := this.last_map[i]
-        this.last_map[i] = data
+            old_data := this.last_map[i]
+            this.last_map[i] = data
         
-        if old_data != data { // if no change no need to alter image
-            // Calculate pixel offsets
-            mut a := (i32((x - half_width) * data)>>10) + half_width
-            mut b := (i32((y - half_height) * data)>>10) + half_height
+            if old_data != data { // if no change no need to alter image
+                // Calculate pixel offsets
+                mut a := (i32((x - half_width) * data)>>10) + half_width
+                mut b := (i32((y - half_height) * data)>>10) + half_height
             
-            // Don't go outside the image (i.e. boundary check)
-            if a >= width { a = width - 1 }
-            if a < 0 { a = 0 }
-            if b >= height { b = height - 1 }
-            if b < 0 { b = 0 }
+                // Don't go outside the image (i.e. boundary check)
+                if a >= width { a = width - 1 }
+                if a < 0 { a = 0 }
+                if b >= height { b = height - 1 }
+                if b < 0 { b = 0 }
 
-            // Apply values
-            this.frame[i] = this.texture[a + (b * width)]
+                // Apply values
+                this.frame[i] = this.texture[a + (b * width)]
+            }
+            map_idx += 1
+            i += 1
         }
-        map_idx += 1
-        i += 1
+        map_idx+=1
+        i+=1
     }
-    map_idx+=1
-    i+=1
-  }
 }
 
 pub fn (mut this App)mousedown ( x u32,y u32 ) {}
@@ -138,14 +138,14 @@ const key_shift = 'Shift\000'
 pub fn (mut app App)keydown ( key &u8, code &u8 ) {}
 
 fn cmp ( a &u8, b &u8 ) bool {
-    unsafe {
-        for *a > 0 && *b > 0 {
-            if *a != *b { break }
-            a += 1
-            b += 1
-        }
-        return *a == *b
-    }
+   unsafe {
+       for *a > 0 && *b > 0 {
+           if *a != *b { break }
+           a += 1
+           b += 1
+       }
+       return *a == *b
+   }
 }
 
 const code_backspace = 'Backspace\000'
@@ -153,35 +153,35 @@ const code_shift_left = 'ShiftLeft\000'
 const code_shift_right = 'ShiftRight\000'
 
 pub fn (mut app App)keyup ( key &u8, code &u8) {
-	if cmp ( code, code_shift_left.str ) {
-		println ( code_shift_left )
-	}
-	if cmp ( code, code_shift_right.str ) {
-		println ( code_shift_right )
-	}
-	println ( 'up' )
+  if cmp ( code, code_shift_left.str ) {
+    println ( code_shift_left )
+  }
+  if cmp ( code, code_shift_right.str ) {
+    println ( code_shift_right )
+  }
+  println ( 'up' )
 }
 
 fn checkerboard ( ) {
-	for y:=0; y<height; y+=1 {
-	  for x:=0; x<width; x+=1 {
-		  if (x%50 < 25) == (y%50 < 25) { 
-		      app.texture[x+y*width] = 128
-		  } else {
-		      app.texture[x+y*width] = 0
-		  }
-	  }
-	}
+  for y:=0; y<height; y+=1 {
+    for x:=0; x<width; x+=1 {
+      if (x%50 < 25) == (y%50 < 25) { 
+        app.texture[x+y*width] = 128
+      } else {
+        app.texture[x+y*width] = 0
+      }
+    }
+  }
 }
 
 // `main` must be public!
 pub fn main ( ) {
-	vwasm_memory_grow ( 10 )
+  vwasm_memory_grow ( 10 )
 
-	title := "V WASM Water demo"
-	JS.settitle ( title )
-	JS.init ( app )
+  title := "V WASM Water demo"
+  JS.settitle ( title )
+  JS.init ( app )
 
   checkerboard ( )
-	app.draw ( )
+  app.draw ( )
 }
